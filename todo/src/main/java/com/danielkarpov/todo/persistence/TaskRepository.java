@@ -1,7 +1,6 @@
 package com.danielkarpov.todo.persistence;
 
 import com.danielkarpov.todo.exception.TaskNotFoundException;
-import com.danielkarpov.todo.model.Dao.tables.pojos.Task;
 import com.danielkarpov.todo.model.Dao.tables.records.TaskRecord;
 import com.danielkarpov.todo.model.Dto.TaskDto;
 import org.jooq.DSLContext;
@@ -10,7 +9,6 @@ import org.jooq.Result;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -48,7 +46,6 @@ public class TaskRepository {
         return optionalTasks;
     }
 
-    @Transactional
     public TaskDto add(TaskDto taskDto) {
 
         TaskRecord persisted = dslContext.insertInto(TASK)
@@ -67,32 +64,38 @@ public class TaskRepository {
         return record;
     }
 
-    @Transactional
-    public int deleteTask(String name) {
-        taskExists(name);
-        return dslContext.delete(TASK)
+    public void safelyDeleteTask(String name) {
+        if (taskExists(name))
+            forcedDeleteTask(name);
+    }
+
+    private void forcedDeleteTask(String name){
+         dslContext.delete(TASK)
                 .where(TASK.NAME.eq(name))
                 .execute();
     }
 
-    public TaskDto updateTask(TaskDto taskDto){
-        this.deleteTask(taskDto.getName());
-        TaskRecord persisted = dslContext.insertInto(TASK)
-                .set(createRecord(taskDto.getName(), taskDto.isStatus()))
-                .returning()
-                .fetchOne();
-
-        return new TaskDto(persisted.getName(), persisted.getStatus());
+    public Optional<TaskDto> updateTask(TaskDto taskDto){
+        if(taskExists(taskDto.getName())) {
+            forcedDeleteTask(taskDto.getName());
+            TaskRecord persisted = dslContext.insertInto(TASK)
+                    .set(createRecord(taskDto.getName(), taskDto.isStatus()))
+                    .returning()
+                    .fetchOne();
+            return Optional.of(new TaskDto(persisted.getName(), persisted.getStatus()));
+        }
+        return Optional.empty();
     }
 
-    @Transactional(readOnly = true)
-    public void taskExists(String name) {
+    public boolean taskExists(String name) {
         TaskRecord queryResult = dslContext.selectFrom(TASK)
                 .where(TASK.NAME.equal(name))
                 .fetchOne();
 
         if (queryResult == null) {
-            throw TaskNotFoundException.causedByTaskNonExistence(name);
+            TaskNotFoundException.causedByTaskNonExistence(name).printStackTrace();
+            return false;
         }
+        return true;
     }
 }

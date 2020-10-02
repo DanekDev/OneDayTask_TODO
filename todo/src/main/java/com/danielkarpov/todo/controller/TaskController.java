@@ -3,10 +3,12 @@ package com.danielkarpov.todo.controller;
 import com.danielkarpov.todo.model.Dto.CreateTaskDto;
 import com.danielkarpov.todo.model.Dto.TaskDto;
 import com.danielkarpov.todo.service.TaskService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/tasks")
@@ -19,7 +21,10 @@ public class TaskController {
 
     @PostMapping("change_status")
     public ResponseEntity<TaskDto> updateTask(@RequestBody TaskDto taskDto) {
-        return ResponseEntity.ok(taskService.updateTask(taskDto));
+        Optional<TaskDto> optionalTaskDto = taskService.updateTask(taskDto);
+        if (optionalTaskDto.isEmpty())
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        return ResponseEntity.ok(taskDto);
     }
 
     @DeleteMapping("{name}")
